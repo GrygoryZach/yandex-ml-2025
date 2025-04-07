@@ -1,64 +1,103 @@
+import os
 import torch
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, Dataset, random_split
-import matplotlib.pyplot as plt
+import pandas as pd
 from PIL import Image
-from typing import Tuple, List
+from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision import transforms
 
 
-def load_fashion_mnist(transform, data_dir='./data'):
-    full_dataset = datasets.FashionMNIST(root=data_dir, train=True, download=True, transform=transform)
-    test_set = datasets.FashionMNIST(root=data_dir, train=False, download=True, transform=transform)
+class PeopleDataset(Dataset):
+    def __init__(self, data_dir, transform=None):
+        self.data_dir = data_dir
+        self.transform = transform
+        self.labels_df = pd.read_csv(os.path.join(data_dir, 'train_answers.csv'))
+        self.img_dir = os.path.join(data_dir, 'img_train')
+        self.image_files = [f for f in os.listdir(self.img_dir) if f.endswith('.jpg')]
 
-    train_size = int(0.8 * len(full_dataset))
-    valid_size = len(full_dataset) - train_size
-
-    train_set, valid_set = random_split(full_dataset, [train_size, valid_size])
-
-    mnist_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-                   'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-
-    return train_set, valid_set, test_set, mnist_names
-
-
-def display_images(dataset: Dataset, class_names: List[str], num_images=30):
-    plt.figure(figsize=(10, 4))
-    for i in range(min(num_images, len(dataset))):
-        image, label = dataset[i]
-        image = image.squeeze().numpy()
-        image = (image * 255).astype('uint8')
-        image = Image.fromarray(image)
-
-        plt.subplot(3, 10, i + 1)
-        plt.xticks([])
-        plt.yticks([])
-        plt.grid(False)
-        plt.imshow(image, cmap=plt.cm.binary)
-        plt.xlabel(class_names[label])
-
-    plt.show()
+    def __len__(self):
+        return len(self.image_files)
+    
+    def __getitem__(self, idx):
+        img_name = self.image_files[idx]
+        img_path = os.path.join(self.img_dir, img_name)
+        image = Image.open(img_path).convert('RGB')
+        
+        img_id = os.path.splitext(img_name)[0]
+        label = self.labels_df[self.labels_df['id'].astype(str) == img_id]['label'].values[0]
+        
+        if self.transform:
+            image = self.transform(image)
+            
+        return image, label
 
 
-def setup_data_loaders(batch_size: int,
-                       train_set: Dataset, valid_set: Dataset, test_set: Dataset,
-                       shuffle_train=True, shuffle_valid=False, shuffle_test=False) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=shuffle_train)
-    valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=shuffle_valid)
-    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=shuffle_test)
-    return train_loader, valid_loader, test_loader
+def get_train_transforms():
+    return transforms.Compose([
+        transforms.RandomResizedCrop(256),
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
 
-# Example of usage
+def get_val_transforms():
+    return transforms.Compose([
+        transforms.Resize(256),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+
+def setup_data_loaders(batch_size, train_set, valid_set=None, num_workers=4):
+    train_loader = DataLoader(
+        train_set,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers
+    )
+
+    valid_loader = DataLoader(
+        valid_set,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers
+    ) if valid_set is not None else None
+    
+    return train_loader, valid_loader
+
+
+def split_dataset(dataset, valid_ratio=0.25):
+    total_size = len(dataset)
+    valid_size = int(total_size * valid_ratio)
+    train_size = total_size - valid_size
+    return random_split(dataset, [train_size, valid_size])
+
+
 if __name__ == "__main__":
-    # Define the transform to apply to the images
-    transform = transforms.Compose([transforms.ToTensor()])
+    train_transforms = get_train_transforms()
+    val_transforms = get_val_transforms()
 
-    # Load the Fashion-MNIST dataset
-    train_set, valid_set, test_set, mnist_names = load_fashion_mnist(transform)
+    data_dir = "path/to/your/data" #PATH TO YOUR DATA
+    full_dataset = PeopleDataset(data_dir)  
+    
+    train_set, valid_set = split_dataset(full_dataset, valid_ratio=0.2)
+    
+    train_set.dataset.transform = train_transforms
+    valid_set.dataset.transform = val_transforms
 
-    # Display the first 30 images from the training set
-    display_images(train_set, mnist_names)
+    batch_size = 32
+    train_loader, valid_loader = setup_data_loaders(
+        batch_size=batch_size,
+        train_set=train_set,
+        valid_set=valid_set
+    )
 
-    # Set up the data loaders
-    batch_size = 64
-    train_loader, valid_loader, test_loader = setup_data_loaders(batch_size, train_set, valid_set, test_set)
+    for images, labels in train_loader:
+        print(f"Train batch shape: {images.shape}")
+        break
+
+    if valid_loader:
+        for images, labels in valid_loader:
+            print(f"Validation batch shape: {images.shape}")
+            break 
