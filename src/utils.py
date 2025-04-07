@@ -10,13 +10,25 @@ import random
 from typing import List
 
 
-def setup_engines(model, optimizer, criterion, device):
-    """Создает тренажер и оценщики Ignite."""
+def setup_trainer(model, optimizer, criterion, device):
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
-    metrics = {"accuracy": Accuracy(), "loss": Loss(criterion)}
+    return trainer
+
+
+def setup_evaluators(model, criterion, device):
+    precision = Precision()
+    recall = Recall()
+    f1 = Fbeta(beta=1.0, average=False, precision=precision, recall=recall)
+
+    metrics = {'accuracy': Accuracy(),
+               'precision': precision,
+               'recall': recall,
+               'f1': f1,
+               "loss": Loss(criterion)}
+
     train_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
     valid_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
-    return trainer, train_evaluator, valid_evaluator
+    return train_evaluator, valid_evaluator
 
 
 def setup_metrics_history():
@@ -29,8 +41,7 @@ def log_iteration_loss(engine):
     print(f"Epoch[{engine.state.epoch}] - Iter[{engine.state.iteration}]: loss = {engine.state.output}")
 
 
-def compute_epoch_results(train_evaluator, valid_evaluator, train_loader, valid_loader):
-    """Вычисляет результаты эпохи."""
+def run_evaluators_on_epoch(train_evaluator, valid_evaluator, train_loader, valid_loader):
     train_evaluator.run(train_loader)
     valid_evaluator.run(valid_loader)
 
@@ -64,15 +75,20 @@ def setup_event_handlers(trainer,
 
         valid_evaluator.add_event_handler(Events.COMPLETED, log_lr)
 
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, run_evaluators_on_epoch, train_evaluator, valid_evaluator,
+    trainer.add_event_handler(Events.EPOCH_COMPLETED,
+                              run_evaluators_on_epoch,
+                              train_evaluator, valid_evaluator,
                               train_loader, valid_loader)
-    train_evaluator.add_event_handler(Events.EPOCH_COMPLETED, log_and_save_epoch_results, label="Train",
-                                      metrics_history=train_metrics_history, silent=silent)
-    valid_evaluator.add_event_handler(Events.EPOCH_COMPLETED, log_and_save_epoch_results, label="Valid",
-                                      metrics_history=valid_metrics_history, silent=silent)
+
+    train_evaluator.add_event_handler(Events.EPOCH_COMPLETED,
+                                      log_and_save_epoch_results,
+                                      label="Train", metrics_history=train_metrics_history, silent=silent)
+
+    valid_evaluator.add_event_handler(Events.EPOCH_COMPLETED,
+                                      log_and_save_epoch_results,
+                                      label="Valid", metrics_history=valid_metrics_history, silent=silent)
 
     scheduler = ReduceLROnPlateauScheduler(optimizer, metric_name="loss", factor=0.5, patience=1, threshold=0.05)
-
     valid_evaluator.add_event_handler(Events.COMPLETED, scheduler)
 
 
