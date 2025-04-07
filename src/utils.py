@@ -1,12 +1,13 @@
 import torch
 from torch.utils.data import DataLoader
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
-from ignite.metrics import Accuracy, Loss
+from ignite.metrics import Precision, Recall, Accuracy, Fbeta, Loss
 from ignite.handlers import ReduceLROnPlateauScheduler
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from collections import defaultdict
 import random
+from typing import List
 
 
 def setup_engines(model, optimizer, criterion, device):
@@ -19,14 +20,12 @@ def setup_engines(model, optimizer, criterion, device):
 
 
 def setup_metrics_history():
-    """Создает словари для хранения истории метрик."""
     train_metrics_history = defaultdict(list)
     valid_metrics_history = defaultdict(list)
     return train_metrics_history, valid_metrics_history
 
 
 def log_iteration_loss(engine):
-    """Выводит потери на каждой итерации."""
     print(f"Epoch[{engine.state.epoch}] - Iter[{engine.state.iteration}]: loss = {engine.state.output}")
 
 
@@ -37,7 +36,6 @@ def compute_epoch_results(train_evaluator, valid_evaluator, train_loader, valid_
 
 
 def log_and_save_epoch_results(engine, label, metrics_history, silent=False):
-    """Выводит результаты эпохи и сохраняет метрики в историю."""
     metrics = engine.state.metrics
     metrics_items = metrics.items()
     result = ', '.join([f"{m} = {v:.4f}" for m, v in metrics_items])
@@ -56,7 +54,6 @@ def setup_event_handlers(trainer,
                          train_metrics_history, valid_metrics_history,
                          train_loader, valid_loader,
                          silent=False):
-    """Настраивает обработчики событий Ignite."""
     if not silent:
         trainer.add_event_handler(Events.ITERATION_COMPLETED(every=1000), log_iteration_loss)
 
@@ -67,7 +64,7 @@ def setup_event_handlers(trainer,
 
         valid_evaluator.add_event_handler(Events.COMPLETED, log_lr)
 
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, compute_epoch_results, train_evaluator, valid_evaluator,
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, run_evaluators_on_epoch, train_evaluator, valid_evaluator,
                               train_loader, valid_loader)
     train_evaluator.add_event_handler(Events.EPOCH_COMPLETED, log_and_save_epoch_results, label="Train",
                                       metrics_history=train_metrics_history, silent=silent)
@@ -79,29 +76,30 @@ def setup_event_handlers(trainer,
     valid_evaluator.add_event_handler(Events.COMPLETED, scheduler)
 
 
-def plot_metrics(train_metrics_history, valid_metrics_history):
-    """Строит графики метрик."""
-    epochs = range(1, len(train_metrics_history["Train loss"]) + 1)
+def plot_metrics(train_metrics_history, valid_metrics_history, metrics_to_plot: List[str]):
+    epochs = range(1, len(train_metrics_history["Loss"]) + 1)
     plt.figure(figsize=(10, 5))
 
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_metrics_history["Train loss"], label="Train Loss", color='blue')
-    plt.plot(epochs, valid_metrics_history["Valid loss"], label="Valid Loss", color='orange')
-    plt.title('Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    def plot_metric(metric_name, train_metric_value, test_metric_value, subplot_num, epochs, is_ylim=False):
+        plt.subplot(1, 2, subplot_num)
+        plt.plot(epochs, train_metric_value, label=f"Train {metric_name}", color='blue')
+        plt.plot(epochs, test_metric_value, label=f"Valid {metric_name}", color='orange')
+        plt.title(metric_name)
+        plt.xlabel("Epochs")
+        plt.ylabel(metric_name)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, train_metrics_history["Train accuracy"], label="Train Accuracy", color='blue')
-    plt.plot(epochs, valid_metrics_history["Valid accuracy"], label="Valid Accuracy", color='orange')
-    plt.title('Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.ylim(0, 1)
-    plt.legend()
-    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        if is_ylim:
+            plt.ylim(0, 1)
+
+        plt.legend()
+        plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+    plot_metric("Loss", train_metrics_history["Loss"], valid_metrics_history["Loss"], 1, epochs)
+
+    for metric_name in metrics_to_plot:
+        train_metric_value = train_metrics_history[metric_name]
+        valid_metric_value = valid_metrics_history[metric_name]
+        plot_metric(metric_name, train_metric_value, valid_metric_value, 2, epochs, is_ylim=True)
 
     plt.tight_layout()
     plt.show()
