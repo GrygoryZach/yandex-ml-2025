@@ -2,3 +2,6 @@ __pycache__/
 venv/
 .env/
 .idea/
+
+
+/data/human_poses_data/
