@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision.transforms import functional as F
 from torchvision import transforms
 
 
@@ -23,8 +24,9 @@ class PeopleDataset(Dataset):
         image = Image.open(img_path).convert('RGB')
         
         img_id = os.path.splitext(img_name)[0]
-        label = self.labels_df[self.labels_df['id'].astype(str) == img_id]['label'].values[0]
-        
+        label = self.labels_df[self.labels_df['img_id'].astype(str) == img_id]['target_feature'].values[0]
+        label = torch.tensor(label, dtype=torch.long)
+
         if self.transform:
             image = self.transform(image)
             
@@ -33,17 +35,14 @@ class PeopleDataset(Dataset):
 
 def get_train_transforms():
     return transforms.Compose([
-        transforms.RandomResizedCrop(256),
-        transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.Resize((256, 512)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-
 def get_val_transforms():
     return transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize((256, 512)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -78,7 +77,7 @@ if __name__ == "__main__":
     train_transforms = get_train_transforms()
     val_transforms = get_val_transforms()
 
-    data_dir = "path/to/your/data" #PATH TO YOUR DATA
+    data_dir = "/Users/semenkaraban/yandex/yandex-ml-2025/data/human_poses_data" #PATH TO YOUR DATA
     full_dataset = PeopleDataset(data_dir)  
     
     train_set, valid_set = split_dataset(full_dataset, valid_ratio=0.2)
