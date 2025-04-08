@@ -3,3 +3,4 @@ venv/
 .env/
 .idea/
 data/
+/data/human_poses_data/
