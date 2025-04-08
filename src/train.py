@@ -5,6 +5,9 @@ from models.__all_models import MiniSimpleton
 import dataloader
 from dataloader import PeopleDataset
 
+from utils import print_batch_shape, setup_trainer, setup_evaluators, setup_event_handlers, setup_metrics_history, \
+    plot_metrics, visualize_predictions, evaluate_model
+
 if __name__ == "__main__":
     # Choose a device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,11 +41,40 @@ if __name__ == "__main__":
         valid_set=valid_set
     )
 
-    train_batch = next(iter(train_loader))
-    images_train, labels_train = train_batch
-    print(f"Train batch shape: {images_train.shape}")
+    # Show batch shape
+    # print_batch_shape(train_loader, "Train")
+    # if valid_loader:
+    #     print_batch_shape(valid_loader, "Validation")
 
-    if valid_loader:
-        valid_batch = next(iter(valid_loader))
-        images_valid, labels_valid = valid_batch
-        print(f"Validation batch shape: {images_valid.shape}")
+    """Training and results"""
+
+    LEARNING_RATE = 0.01
+    MOMENTUM = 0.9
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+    criterion = torch.nn.CrossEntropyLoss()
+
+    print("Setting up trainer and evaluators...")
+    trainer = setup_trainer(model, optimizer, criterion, device)
+    train_evaluator, valid_evaluator = setup_evaluators(model, criterion, device)
+
+    print("Setting up event handlers...")
+    train_metrics_history, valid_metrics_history = setup_metrics_history()
+    setup_event_handlers(trainer, optimizer,
+                         train_evaluator, valid_evaluator,
+                         train_metrics_history, valid_metrics_history,
+                         train_loader, valid_loader)
+
+    print("Training loop started")
+    trainer.run(train_loader, 30)
+
+    metrics_to_plot = ["Accuracy"]
+    plot_metrics(train_metrics_history, valid_metrics_history, metrics_to_plot=metrics_to_plot)
+
+    class_names = ['sports', 'inactivity quiet/light', 'miscellaneous', 'occupation', 'water activities',
+                   'home activities', 'lawn and garden', 'religious activities', 'winter activities',
+                   'conditioning exercise', 'bicycling', 'fishing and hunting', 'dancing', 'walking', 'running',
+                   'self care', 'home repair', 'volunteer activities', 'music playing', 'transportation']
+    visualize_predictions(model, valid_loader, device, class_names)
+
+    # evaluate_model(model, test_loader, criterion, device)

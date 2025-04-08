@@ -59,9 +59,8 @@ def log_and_save_epoch_results(engine, label, metrics_history, silent=False):
         metrics_history[metric_name].append(value)
 
 
-def setup_event_handlers(trainer,
+def setup_event_handlers(trainer, optimizer,
                          train_evaluator, valid_evaluator,
-                         optimizer,
                          train_metrics_history, valid_metrics_history,
                          train_loader, valid_loader,
                          silent=False):
@@ -158,3 +157,9 @@ def evaluate_model(model, test_loader, criterion, device, out_for_table=False):
         print(f"| {params_count} | {metrics['accuracy']:.4f} | {metrics['loss']:.4f} |")
     else:
         print(f"Test Results: Accuracy = {metrics['accuracy']:.4f}, Loss = {metrics['loss']:.4f}")
+
+
+def print_batch_shape(data_loader: DataLoader, loader_type: str, ):
+    valid_batch = next(iter(data_loader))
+    images_valid, labels_valid = valid_batch
+    print(f"{loader_type} batch shape: {images_valid.shape}")
