@@ -1,16 +1,19 @@
-import torch
+from torch import device, cuda
+from torch.optim import SGD
+from torch.nn import CrossEntropyLoss
 from torchsummary import summary
 
 from models.__all_models import MiniSimpleton
 import dataloader
 from dataloader import PeopleDataset
 
-from utils import print_batch_shape, setup_trainer, setup_evaluators, setup_event_handlers, setup_metrics_history, \
-    plot_metrics, visualize_predictions, evaluate_model
+from utils import print_batch_shape, evaluate_model, \
+    setup_trainer, setup_evaluators, setup_event_handlers, setup_metrics_history
+from plotting import plot_metric_and_loss, plot_metrics, visualize_predictions
 
 if __name__ == "__main__":
     # Choose a device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = device("cuda" if cuda.is_available() else "cpu")
     print(device)
 
     # Choose a model and show its summary
@@ -18,12 +21,14 @@ if __name__ == "__main__":
     summary(model, (3, 256, 512))
     print("\n")
 
+    """Preparing the data"""
+
     # Setup trainers
     train_transforms = dataloader.get_train_transforms()
     val_transforms = dataloader.get_val_transforms()
 
     # Upload data nd initialize a dataset
-    DATA_DIR = "D:\\yandex-ml-2025\\data\\human_poses_data"
+    DATA_DIR = "PATH TO YOUR DATA"
     print("Uploading data...")
     full_dataset = PeopleDataset(DATA_DIR)
 
@@ -46,30 +51,37 @@ if __name__ == "__main__":
     # if valid_loader:
     #     print_batch_shape(valid_loader, "Validation")
 
-    """Training and results"""
+    """Training"""
 
     LEARNING_RATE = 0.01
     MOMENTUM = 0.9
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
-    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+    criterion = CrossEntropyLoss()
 
     print("Setting up trainer and evaluators...")
     trainer = setup_trainer(model, optimizer, criterion, device)
     train_evaluator, valid_evaluator = setup_evaluators(model, criterion, device)
 
     print("Setting up event handlers...")
+    # Output is shown every <LOG_INTERVAL> iteration
+    LOG_INTERVAL = 25
     train_metrics_history, valid_metrics_history = setup_metrics_history()
     setup_event_handlers(trainer, optimizer,
                          train_evaluator, valid_evaluator,
                          train_metrics_history, valid_metrics_history,
-                         train_loader, valid_loader)
+                         train_loader, valid_loader,
+                         log_interval=LOG_INTERVAL)
 
-    print("Training loop started")
-    trainer.run(train_loader, 30)
+    print("Training loop started\n")
+    trainer.run(train_loader, 10)
 
-    metrics_to_plot = ["Accuracy"]
+    # Plot several metrics at once
+    metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1', 'loss']
     plot_metrics(train_metrics_history, valid_metrics_history, metrics_to_plot=metrics_to_plot)
+
+    # To plot loss and one metric
+    # plot_metric_and_loss(train_metrics_history, valid_metrics_history, "accuracy")
 
     class_names = ['sports', 'inactivity quiet/light', 'miscellaneous', 'occupation', 'water activities',
                    'home activities', 'lawn and garden', 'religious activities', 'winter activities',

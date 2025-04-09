@@ -49,13 +49,15 @@ def run_evaluators_on_epoch(train_evaluator, valid_evaluator, train_loader, vali
 def log_and_save_epoch_results(engine, label, metrics_history, silent=False):
     metrics = engine.state.metrics
     metrics_items = metrics.items()
-    result = ', '.join([f"{m} = {v:.4f}" for m, v in metrics_items])
-
+    result = ', '.join([
+        f"{m} = {v.mean().item():.4f}" if isinstance(v, torch.Tensor) and v.numel() > 1 else f"{m} = {v.item():.4f}"
+        if isinstance(v, torch.Tensor) else f"{m} = {v:.4f}"
+        for m, v in metrics_items
+    ])
     if not silent:
         print(f"{label}: {result}")
 
-    for metric, value in metrics_items:
-        metric_name = f"{label} {metric}"
+    for metric_name, value in metrics_items:
         metrics_history[metric_name].append(value)
 
 
@@ -63,9 +65,9 @@ def setup_event_handlers(trainer, optimizer,
                          train_evaluator, valid_evaluator,
                          train_metrics_history, valid_metrics_history,
                          train_loader, valid_loader,
-                         silent=False):
+                         silent=False, log_interval=100):
     if not silent:
-        trainer.add_event_handler(Events.ITERATION_COMPLETED(every=1000), log_iteration_loss)
+        trainer.add_event_handler(Events.ITERATION_COMPLETED(every=log_interval), log_iteration_loss)
 
         def log_lr():
             for param_group in optimizer.param_groups:
@@ -89,60 +91,6 @@ def setup_event_handlers(trainer, optimizer,
 
     scheduler = ReduceLROnPlateauScheduler(optimizer, metric_name="loss", factor=0.5, patience=1, threshold=0.05)
     valid_evaluator.add_event_handler(Events.COMPLETED, scheduler)
-
-
-def plot_metrics(train_metrics_history, valid_metrics_history, metrics_to_plot: List[str]):
-    epochs = range(1, len(train_metrics_history["Loss"]) + 1)
-    plt.figure(figsize=(10, 5))
-
-    def plot_metric(metric_name, train_metric_value, test_metric_value, subplot_num, epochs, is_ylim=False):
-        plt.subplot(1, 2, subplot_num)
-        plt.plot(epochs, train_metric_value, label=f"Train {metric_name}", color='blue')
-        plt.plot(epochs, test_metric_value, label=f"Valid {metric_name}", color='orange')
-        plt.title(metric_name)
-        plt.xlabel("Epochs")
-        plt.ylabel(metric_name)
-
-        if is_ylim:
-            plt.ylim(0, 1)
-
-        plt.legend()
-        plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-
-    plot_metric("Loss", train_metrics_history["Loss"], valid_metrics_history["Loss"], 1, epochs)
-
-    for metric_name in metrics_to_plot:
-        train_metric_value = train_metrics_history[metric_name]
-        valid_metric_value = valid_metrics_history[metric_name]
-        plot_metric(metric_name, train_metric_value, valid_metric_value, 2, epochs, is_ylim=True)
-
-    plt.tight_layout()
-    plt.show()
-
-
-def visualize_predictions(model, valid_loader, device, class_names, num_images=15):
-    model.eval()
-    images, labels = next(iter(valid_loader))
-    images, labels = images.to(device), labels.to(device)
-
-    with torch.no_grad():
-        outputs = model(images)
-        _, predicted = torch.max(outputs, 1)
-
-    random_indices = random.sample(range(len(images)), num_images)
-    fig, axes = plt.subplots(3, 5, figsize=(8, 5))
-    axes = axes.flatten()
-
-    for i, idx in enumerate(random_indices):
-        ax = axes[i]
-        ax.imshow(images[idx].cpu().numpy().transpose(1, 2, 0))
-
-        title = f"Pred: {class_names[predicted[idx].item()]}\nTrue: {class_names[labels[idx].item()]}"
-        ax.set_title(title)
-        ax.axis('off')
-
-    plt.tight_layout()
-    plt.show()
 
 
 def evaluate_model(model, test_loader, criterion, device, out_for_table=False):
