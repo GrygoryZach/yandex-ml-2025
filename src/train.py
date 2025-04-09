@@ -14,8 +14,8 @@ if __name__ == "__main__":
     print(device)
 
     # Choose a model and show its summary
-    model = MiniSimpleton().to(device)
-    summary(model, (1, 28, 28))
+    model = MiniSimpleton(device)
+    summary(model, (3, 256, 512))
     print("\n")
 
     # Setup trainers
