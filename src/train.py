@@ -11,6 +11,8 @@ from utils.engine import setup_trainer, setup_evaluators
 from utils.logging import setup_event_handlers, setup_metrics_history
 from utils.plotting import plot_metrics, visualize_predictions
 
+from config import PATH_TO_DATA
+
 if __name__ == "__main__":
     # Choose a device
     device = device("cuda" if cuda.is_available() else "cpu")
@@ -28,9 +30,8 @@ if __name__ == "__main__":
     val_transforms = dataloader.get_val_transforms()
 
     # Upload data nd initialize a dataset
-    DATA_DIR = "PATH TO YOUR DATA"
     print("Uploading data...")
-    full_dataset = PeopleDataset(DATA_DIR)
+    full_dataset = PeopleDataset(PATH_TO_DATA)
 
     train_set, valid_set = dataloader.split_dataset(full_dataset, valid_ratio=0.2)
 
@@ -74,7 +75,8 @@ if __name__ == "__main__":
                          log_interval=LOG_INTERVAL)
 
     print("Training loop started\n")
-    trainer.run(train_loader, 10)
+    EPOCHS_NUM = 10
+    trainer.run(train_loader, EPOCHS_NUM)
 
     # Plot several metrics at once
     metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1', 'loss']
