@@ -7,9 +7,9 @@ from models.__all_models import MiniSimpleton
 import dataloader
 from dataloader import PeopleDataset
 
-from utils import print_batch_shape, evaluate_model, \
-    setup_trainer, setup_evaluators, setup_event_handlers, setup_metrics_history
-from plotting import plot_metric_and_loss, plot_metrics, visualize_predictions
+from utils.engine import setup_trainer, setup_evaluators
+from utils.logging import setup_event_handlers, setup_metrics_history
+from utils.plotting import plot_metrics, visualize_predictions
 
 if __name__ == "__main__":
     # Choose a device

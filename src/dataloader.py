@@ -3,7 +3,6 @@ import torch
 import pandas as pd
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision.transforms import functional as F
 from torchvision import transforms
 
 
@@ -17,19 +16,19 @@ class PeopleDataset(Dataset):
 
     def __len__(self):
         return len(self.image_files)
-    
+
     def __getitem__(self, idx):
         img_name = self.image_files[idx]
         img_path = os.path.join(self.img_dir, img_name)
         image = Image.open(img_path).convert('RGB')
-        
+
         img_id = os.path.splitext(img_name)[0]
         label = self.labels_df[self.labels_df['img_id'].astype(str) == img_id]['target_feature'].values[0]
         label = torch.tensor(label, dtype=torch.long)
 
         if self.transform:
             image = self.transform(image)
-            
+
         return image, label
 
 
@@ -39,6 +38,7 @@ def get_train_transforms():
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+
 
 def get_val_transforms():
     return transforms.Compose([
@@ -62,8 +62,14 @@ def setup_data_loaders(batch_size, train_set, valid_set=None, num_workers=4):
         shuffle=False,
         num_workers=num_workers
     ) if valid_set is not None else None
-    
+
     return train_loader, valid_loader
+
+
+def print_batch_shape(data_loader: DataLoader, loader_type: str, ):
+    valid_batch = next(iter(data_loader))
+    images_valid, labels_valid = valid_batch
+    print(f"{loader_type} batch shape: {images_valid.shape}")
 
 
 def split_dataset(dataset, valid_ratio=0.25):
@@ -77,11 +83,11 @@ if __name__ == "__main__":
     train_transforms = get_train_transforms()
     val_transforms = get_val_transforms()
 
-    data_dir = "/Users/semenkaraban/yandex/yandex-ml-2025/data/human_poses_data" #PATH TO YOUR DATA
-    full_dataset = PeopleDataset(data_dir)  
-    
+    data_dir = "PATH TO YOUR DATA"
+    full_dataset = PeopleDataset(data_dir)
+
     train_set, valid_set = split_dataset(full_dataset, valid_ratio=0.2)
-    
+
     train_set.dataset.transform = train_transforms
     valid_set.dataset.transform = val_transforms
 
@@ -92,11 +98,6 @@ if __name__ == "__main__":
         valid_set=valid_set
     )
 
-    for images, labels in train_loader:
-        print(f"Train batch shape: {images.shape}")
-        break
-
+    print_batch_shape(train_loader, "Train")
     if valid_loader:
-        for images, labels in valid_loader:
-            print(f"Validation batch shape: {images.shape}")
-            break 
+        print_batch_shape(valid_loader, "Validation")
