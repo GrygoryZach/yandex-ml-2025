@@ -7,7 +7,7 @@ from torchsummary import summary
 from sklearn.metrics import precision_score, recall_score, f1_score
 import numpy as np
 
-from models.__all_models import MiniSimpleton
+from models.__all_models import *
 import dataloader
 from dataloader import PeopleDataset
 
@@ -42,8 +42,7 @@ if __name__ == "__main__":
     train_transforms = dataloader.get_train_transforms()
     val_transforms = dataloader.get_val_transforms()
 
-    # Upload data nd initialize a dataset
-    print("Loading dataset...")
+    print("Loading the dataset...")
     full_dataset = PeopleDataset(PATH_TO_DATA)
 
     train_set, valid_set = dataloader.split_dataset(full_dataset, valid_ratio=0.2)
@@ -145,12 +144,11 @@ if __name__ == "__main__":
         print(f"Train - Loss: {train_loss:.4f}, Acc: {train_accuracy:.2f}%, "
               f"Precision: {train_precision:.4f}, Recall: {train_recall:.4f}, F1: {train_f1:.4f}")
         if valid_loader:
-            print(f"Valid - Loss: {val_loss:.4f}, Acc: {val_accuracy:.2f}%, "
-                  f"Precision: {val_precision:.4f}, Recall: {val_recall:.4f}, F1: {val_f1:.4f}")
+            print(f"Valid - Loss: {val_loss:.4f}, Acc: {val_accuracy:.2f}%,"
+                  f" Precision: {val_precision:.4f}, Recall: {val_recall:.4f}, F1: {val_f1:.4f}")
 
     """Results visualization"""
     print("\nTraining completed!")
-
     metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1', 'loss']
     plot_metrics(train_metrics_history, valid_metrics_history, metrics_to_plot=metrics_to_plot)
 
