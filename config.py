@@ -1,1 +1,1 @@
-PATH_TO_DATA = "PATH TO YOUR DATA"
+PATH_TO_DATA = "V:\ML\yandex-ml-2025\data"
